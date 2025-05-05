@@ -1,9 +1,8 @@
 import speech_recognition as sr
-import os, sys, subprocess
-import time, random
+import os, sys, subprocess, json
+import time
 import webbrowser
 import threading
-import datetime
 import pygame
 
 # Global variables to manage music playback
@@ -13,25 +12,8 @@ paused = False
 music_stopped = False
 
 # Defining folder & file paths here
-music_folder = r'C:\Users\three\Nathan\Coding\Python\PythonCodeEnv\MegaProject'
-botData = "botData.txt"
+music_folder = r'C:\Users\nathan\Music\Fav'
 
-def readLine(line_number, filename=botData):
-  with open(filename, 'r') as f:
-    for i, line in enumerate(f):
-      if i == line_number - 1:
-        return line.strip()
-def writeLine(line_number, new_text, filename=botData):
-  lines = []
-  with open(filename, 'r') as f:
-    for i, line in enumerate(f):
-      if i == line_number - 1:
-        lines.append(new_text + '\n')
-      else:
-        lines.append(line)
-
-  with open(filename, 'w') as f:
-    f.writelines(lines)
 def restartProgram():
     try:
         python = sys.executable
@@ -167,6 +149,23 @@ def previous_music():
     else:
         print("No previous tracks in the playlist.")
 
+def change_bot_name():
+    global botName
+    say("What should I name the bot?")
+    command = takeCommand()
+    botName["name"] = command
+    with open("botData.json", "w") as f:
+        json.dump(botName, f, indent=4)
+    with open("botData.json", "r") as f:
+        botName = json.load(f)
+    say(f"Your bot is named {botName}")
+    print(f"Your bot is named {botName}")
+
+def get_bot_name():
+    global botName
+    with open("botData.json", "r") as f:
+        botName = json.load(f)
+    botName = botName["botName"]
 
 def processTask(command):
     print("Processing command")
@@ -205,12 +204,7 @@ def processTask(command):
             previous_music()
             print("Playing previous music")
         elif "change bot name" in command:
-            say("what should I name the bot.")
-            command = takeCommand()
-            writeLine(1, command)
-            botName = readLine(1)
-            say(f"Your bot is named {botName}")
-            print(f"Your bot is named {botName}")
+            change_bot_name()
         elif "open" in command:
             for site in sites:
                 if f"open {site[0]}".lower() in command:
@@ -223,7 +217,7 @@ def processTask(command):
 
 def main():
     try:
-        botName = readLine(1).lower()
+        get_bot_name()
         say(f"Intializing {botName}")
         while True:
             command = takeCommand()
