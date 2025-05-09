@@ -3,7 +3,7 @@ import os, sys, subprocess, json
 import time
 import webbrowser
 import threading
-import pygame
+import pygame, pyaudio
 
 # Global variables to manage music playback
 current_track_index = 0
@@ -29,33 +29,38 @@ def say(text):
     # os.system(f'say "{text}"')
 def takeCommand():
     try:
-        # r = sr.Recognizer()
-        # command = input("Call Jarvis: ")
-        # with sr.Microphone() as source:
-        #     # r.pause_threshold =  0.6
-        #     audio = r.listen(source,timeout=5)
-        #     print("Recognizing...")
-        #     command = r.recognize_google(audio, language="en-in")
-        #     command = command.lower()
-        #     print(f"User said: {command}")
-        # if (command == botName.lower()):
-        if True:
-            # say(f"Yes")
-            command = input("Enter command: ")
-            # with sr.Microphone() as source:
-            #     # r.pause_threshold =  0.6
-            #     audio = r.listen(source,timeout=5)
-            #     print("Recognizing...")
-            #     command = r.recognize_google(audio, language="en-in")
-            #     command = command.lower()
+        r = sr.Recognizer()
+        # command = input("Enter command: ")
+        with sr.Microphone() as source:
+            r.pause_threshold =  0.6
+            audio = r.listen(source,timeout=5)
+        print("Recognizing...")
+        heardText = "Initial Text"
+        heardText = r.recognize_google(audio, language="en-in")
+        if heardText == "" or heardText == None or heardText == " ":
+            takeCommand()
+            print("retaking command")
+        else:
+            command = heardText.lower()
+            print(f"User said: {heardText}")
             print(f"User said: {command}")
             return command
     except sr.WaitTimeoutError:
         takeCommand()
     except sr.UnknownValueError:
         print("Could not understand audio")
+        takeCommand()
     except sr.RequestError as e:
         print(f"Error:{e}")
+
+def wait_for_call():
+    print("Wait call func started")
+    command = takeCommand()
+    print(command)
+    if command == get_bot_data("name").lower():
+        say(f"Yes Boss?")
+        return True
+
 
 def initialize_mixer():
     try:
@@ -161,16 +166,14 @@ def change_bot_name():
     say(f"Your bot is named {botName}")
     print(f"Your bot is named {botName}")
 
-def get_bot_name():
-    global botName
+def get_bot_data(valName):
     with open("botData.json", "r") as f:
-        botName = json.load(f)
-    botName = botName["botName"]
+        botData = json.load(f)
+    return botData[valName]
 
 def processTask(command):
     print("Processing command")
     try:
-        global botName
         sites = [
                 ["youtube", "https://youtube.com"],
                 ["google", "https://google.com"],
@@ -188,7 +191,10 @@ def processTask(command):
                 ["google keep", "https://keep.google.com"],
                 ["presentation", "https://docs.google.com/presentation"]
                 ]
-        if "play music" in command:
+        if get_bot_data("name") in command:
+            say("Yes Boss, Im listening.")
+            processTask(takeCommand())
+        elif "play music" in command:
             play_music_thread()
             print("Playing music")
         elif "pause music" in command:
@@ -217,11 +223,15 @@ def processTask(command):
 
 def main():
     try:
-        get_bot_name()
+        botName = get_bot_data("name")
         say(f"Intializing {botName}")
         while True:
-            command = takeCommand()
-            processTask(command)
+            print("Waiting for call...")
+            if wait_for_call():
+                print(f"{botName} is called")
+                command = takeCommand()
+                processTask(command)
+                print("Processed task")
     except KeyboardInterrupt:
         restartProgram()
 

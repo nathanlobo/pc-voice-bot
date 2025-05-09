@@ -2,7 +2,7 @@ import json
 
 # code to feed data into json file
 data = {
-    "bot_name": "Lobo",
+    "bot_name": "Jarvis",
 }
 
 with open("botData.json", "w") as f:
