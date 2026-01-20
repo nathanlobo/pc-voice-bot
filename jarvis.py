@@ -17,6 +17,18 @@ engine = pyttsx3.init()
 engine.setProperty('rate', 170) 
 engine.setProperty('volume', 1.0)
 
+# Speech recognition tuning for faster response and better end-of-speech detection
+R = sr.Recognizer()
+R.dynamic_energy_threshold = True
+# Initial threshold; will be quickly recalibrated each listen
+R.energy_threshold = 250
+# Shorter pause threshold helps end phrase sooner
+R.pause_threshold = 0.6
+# Detect speech onset quickly
+R.phrase_threshold = 0.1
+# Reduce tail silence to cut waiting time after you stop talking
+R.non_speaking_duration = 0.3
+
 # Music State
 current_track_index = 0
 music_files = []
@@ -46,16 +58,25 @@ def get_bot_name():
         return DEFAULT_BOT_NAME
 
 def listen_input(prompt=None):
-    r = sr.Recognizer()
+    # Use a single recognizer instance tuned above to reduce reinitialization overhead
     with sr.Microphone() as source:
-        if prompt: print(prompt)
-        r.pause_threshold = 1.0
-        r.adjust_for_ambient_noise(source)
-        
+        if prompt:
+            print(prompt)
+        # Fast ambient calibration (default 1.0s is slow)
         try:
-            # Listening for command
-            audio = r.listen(source, timeout=None, phrase_time_limit=6)
-            query = r.recognize_google(audio, language="en-in")
+            R.adjust_for_ambient_noise(source, duration=0.25)
+        except Exception:
+            # Non-fatal; continue with existing thresholds
+            pass
+
+        try:
+            # Listen with a reasonable phrase time limit to avoid long waits
+            audio = R.listen(source, timeout=None, phrase_time_limit=5)
+            # Primary: Indian English, fallback: US English (only if first fails to parse)
+            try:
+                query = R.recognize_google(audio, language="en-in")
+            except sr.UnknownValueError:
+                query = R.recognize_google(audio, language="en-US")
             print(f"[USER]: {query}")
             return query.lower()
         except sr.WaitTimeoutError:
@@ -105,7 +126,7 @@ def play_music_logic():
                     
                     while pygame.mixer.music.get_busy() or paused:
                         if music_stopped: break
-                        time.sleep(1)
+                        time.sleep(0.3)
                     
                     if not music_stopped:
                         current_track_index = (current_track_index + 1) % len(music_files)
@@ -113,7 +134,7 @@ def play_music_logic():
                     print(f"Playback error: {e}")
                     break
         else:
-            time.sleep(1)
+            time.sleep(0.3)
 
 def start_music_thread():
     global music_stopped, paused
@@ -152,12 +173,12 @@ def process_command(command):
             start_music_thread()
             speak("Playing music.")
         
-    elif "pause music" in command:
+    elif "pause" in command or "pause music" in command or "stop music" in command:
         paused = True
         pygame.mixer.music.pause()
         speak("Music paused.")
         
-    elif "resume music" in command:
+    elif "resume" in command or "resume music" in command:
         paused = False
         pygame.mixer.music.unpause()
         speak("Resuming music.")
@@ -180,6 +201,15 @@ def process_command(command):
             speak(f"Name changed to {new_name}")
 
     elif "open" in command:
+        if "code editor" in command:
+            speak("Opening Code Editor")
+            try:
+                os.startfile(r"C:\Users\nathan\Developer_Lobo\College\codinx-workspace.pyw")
+            except Exception as e:
+                speak("Failed to open Codinx Workspace.")
+                print(f"Error opening Codinx Workspace: {e}")
+            return
+
         for site_name, url in sites.items():
             if site_name in command:
                 speak(f"Opening {site_name}")
@@ -201,22 +231,15 @@ def main():
         command = listen_input()
         
         if command:
-            # If user calls the bot by name (e.g., "Jarvis, play music")
             if bot_name.lower() in command:
-                # Optional: You can make it ask "Yes boss?" here, or just process the command directly.
-                # Currently, it checks if there is a command included with the name.
-                
-                # If command is JUST the name (e.g. "Jarvis"), ask for input
                 if command.strip() == bot_name.lower():
                     speak("Yes?")
                     specific_cmd = listen_input()
                     if specific_cmd:
                         process_command(specific_cmd)
                 else:
-                    # If command is "Jarvis open youtube", process it
                     process_command(command)
             else:
-                # Also process direct commands without name (e.g. "Open Youtube")
                 process_command(command)
 
 if __name__ == "__main__":
